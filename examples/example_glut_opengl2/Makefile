@@ -25,6 +25,13 @@ LIBS =
 ## BUILD FLAGS PER PLATFORM
 ##---------------------------------------------------------------------
 
+ifeq ($(UNAME_S), MorphOS) #MORPHOS
+	ECHO_MESSAGE = "MorphOS"
+	CXXFLAGS += -noixemul
+	LIBS += -laboxstubs -lglut -lGLU -lGL
+	CFLAGS = $(CXXFLAGS)
+endif
+
 ifeq ($(UNAME_S), Linux) #LINUX
 	ECHO_MESSAGE = "Linux"
 	LIBS += -lGL -lglut

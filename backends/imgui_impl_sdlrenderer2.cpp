@@ -228,7 +228,11 @@ bool ImGui_ImplSDLRenderer2_CreateFontsTexture()
 
     // Upload texture to graphics system
     // (Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling)
+#ifdef __MORPHOS__
+	bd->FontTexture = SDL_CreateTexture(bd->Renderer, SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STATIC, width, height);
+#else
     bd->FontTexture = SDL_CreateTexture(bd->Renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STATIC, width, height);
+#endif
     if (bd->FontTexture == nullptr)
     {
         SDL_Log("error creating texture");

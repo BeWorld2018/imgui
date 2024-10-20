@@ -30,6 +30,14 @@ LIBS =
 ## BUILD FLAGS PER PLATFORM
 ##---------------------------------------------------------------------
 
+ifeq ($(UNAME_S), MorphOS) #MORPHOS
+	ECHO_MESSAGE = "MorphOS"
+	LIBS += `sdl2-config --libs`
+
+	CXXFLAGS += `sdl2-config --cflags`
+	CFLAGS = $(CXXFLAGS)
+endif
+
 ifeq ($(UNAME_S), Linux) #LINUX
 	ECHO_MESSAGE = "Linux"
 	LIBS += -lGL -ldl `sdl2-config --libs`
