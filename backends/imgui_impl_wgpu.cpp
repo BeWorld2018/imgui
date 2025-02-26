@@ -4,7 +4,7 @@
 
 // Implemented features:
 //  [X] Renderer: User texture binding. Use 'WGPUTextureView' as ImTextureID. Read the FAQ about ImTextureID!
-//  [X] Renderer: Large meshes support (64k+ vertices) with 16-bit indices.
+//  [X] Renderer: Large meshes support (64k+ vertices) even with 16-bit indices (ImGuiBackendFlags_RendererHasVtxOffset).
 //  [X] Renderer: Expose selected render state for draw callbacks to use. Access in '(ImGui_ImplXXXX_RenderState*)GetPlatformIO().Renderer_RenderState'.
 
 // You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
@@ -17,6 +17,7 @@
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
+//  2024-10-14: Update Dawn support for change of string usages. (#8082, #8083)
 //  2024-10-07: Expose selected render state in ImGui_ImplWGPU_RenderState, which you can access in 'void* platform_io.Renderer_RenderState' during draw callbacks.
 //  2024-10-07: Changed default texture sampler to Clamp instead of Repeat/Wrap.
 //  2024-09-16: Added support for optional IMGUI_IMPL_WEBGPU_BACKEND_DAWN / IMGUI_IMPL_WEBGPU_BACKEND_WGPU define to handle ever-changing native implementations. (#7977)
@@ -56,6 +57,12 @@
 #include "imgui_impl_wgpu.h"
 #include <limits.h>
 #include <webgpu/webgpu.h>
+
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+// Dawn renamed WGPUProgrammableStageDescriptor to WGPUComputeState (see: https://github.com/webgpu-native/webgpu-headers/pull/413)
+// Using type alias until WGPU adopts the same naming convention (#8369)
+using WGPUProgrammableStageDescriptor = WGPUComputeState;
+#endif
 
 // Dear ImGui prototypes from imgui_internal.h
 extern ImGuiID ImHashData(const void* data_p, size_t data_size, ImU32 seed = 0);
@@ -261,13 +268,13 @@ static WGPUProgrammableStageDescriptor ImGui_ImplWGPU_CreateShaderModule(const c
     ImGui_ImplWGPU_Data* bd = ImGui_ImplWGPU_GetBackendData();
 
 #ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
-	WGPUShaderSourceWGSL wgsl_desc = {};
+    WGPUShaderSourceWGSL wgsl_desc = {};
     wgsl_desc.chain.sType = WGPUSType_ShaderSourceWGSL;
-	wgsl_desc.code = { wgsl_source, WGPU_STRLEN };
+    wgsl_desc.code = { wgsl_source, WGPU_STRLEN };
 #else
-	WGPUShaderModuleWGSLDescriptor wgsl_desc = {};
+    WGPUShaderModuleWGSLDescriptor wgsl_desc = {};
     wgsl_desc.chain.sType = WGPUSType_ShaderModuleWGSLDescriptor;
-	wgsl_desc.code = wgsl_source;
+    wgsl_desc.code = wgsl_source;
 #endif
 
     WGPUShaderModuleDescriptor desc = {};
@@ -275,7 +282,11 @@ static WGPUProgrammableStageDescriptor ImGui_ImplWGPU_CreateShaderModule(const c
 
     WGPUProgrammableStageDescriptor stage_desc = {};
     stage_desc.module = wgpuDeviceCreateShaderModule(bd->wgpuDevice, &desc);
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+    stage_desc.entryPoint = { "main", WGPU_STRLEN };
+#else
     stage_desc.entryPoint = "main";
+#endif
     return stage_desc;
 }
 
@@ -388,6 +399,9 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
         {
             nullptr,
             "Dear ImGui Vertex buffer",
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+            WGPU_STRLEN,
+#endif
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Vertex,
             MEMALIGN(fr->VertexBufferSize * sizeof(ImDrawVert), 4),
             false
@@ -412,6 +426,9 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
         {
             nullptr,
             "Dear ImGui Index buffer",
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+            WGPU_STRLEN,
+#endif
             WGPUBufferUsage_CopyDst | WGPUBufferUsage_Index,
             MEMALIGN(fr->IndexBufferSize * sizeof(ImDrawIdx), 4),
             false
@@ -507,7 +524,7 @@ void ImGui_ImplWGPU_RenderDrawData(ImDrawData* draw_data, WGPURenderPassEncoder 
         global_idx_offset += draw_list->IdxBuffer.Size;
         global_vtx_offset += draw_list->VtxBuffer.Size;
     }
-    platform_io.Renderer_RenderState = NULL;
+    platform_io.Renderer_RenderState = nullptr;
 }
 
 static void ImGui_ImplWGPU_CreateFontsTexture()
@@ -522,7 +539,11 @@ static void ImGui_ImplWGPU_CreateFontsTexture()
     // Upload texture to graphics system
     {
         WGPUTextureDescriptor tex_desc = {};
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+        tex_desc.label = { "Dear ImGui Font Texture", WGPU_STRLEN };
+#else
         tex_desc.label = "Dear ImGui Font Texture";
+#endif
         tex_desc.dimension = WGPUTextureDimension_2D;
         tex_desc.size.width = width;
         tex_desc.size.height = height;
@@ -585,6 +606,9 @@ static void ImGui_ImplWGPU_CreateUniformBuffer()
     {
         nullptr,
         "Dear ImGui Uniform buffer",
+#ifdef IMGUI_IMPL_WEBGPU_BACKEND_DAWN
+        WGPU_STRLEN,
+#endif
         WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
         MEMALIGN(sizeof(Uniforms), 16),
         false
